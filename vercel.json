@@ -1,0 +1,8 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "build",
+  "env": {
+    "GENERATE_SOURCEMAP": "false",
+    "CI": "false"
+  }
+}
