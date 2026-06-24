@@ -136,22 +136,28 @@ export default function App() {
       setMoodColor(result.color);
 
       if (user) {
-        const myFriends = await getDocs(collection(db, 'users', user.uid, 'friends'));
-        const friendUids = myFriends.docs.map(d => d.data().uid);
-        const visibleTo  = [user.uid, ...friendUids];
-        await setDoc(doc(db, 'moods', user.uid), {
-          userId:    user.uid,
-          username:  myUsername,
-          name:      user.displayName,
-          photo:     user.photoURL,
-          emotion:   dominant,
-          emoji:     result.emoji,
-          score:     result.sc,
-          color:     result.color,
-          timestamp: Date.now(),
-          visibleTo,
-        });
-      }
+  try {
+    const myFriends = await getDocs(
+      collection(db, 'users', user.uid, 'friends')
+    );
+    const friendUids = myFriends.docs.map(d => d.data().uid);
+    const visibleTo  = [user.uid, ...friendUids];
+    await setDoc(doc(db, 'moods', user.uid), {
+      userId:    user.uid,
+      username:  myUsername || 'user',
+      name:      user.displayName || 'User',
+      photo:     user.photoURL || '',
+      emotion:   dominant,
+      emoji:     result.emoji,
+      score:     result.sc,
+      color:     result.color,
+      timestamp: Date.now(),
+      visibleTo,
+    });
+  } catch (fireErr) {
+    console.log('Firestore save error:', fireErr.message);
+  }
+}
     } catch (e) { setFeedback('Error aaya — dobara try karo!'); }
     setAnalyzing(false);
   };
