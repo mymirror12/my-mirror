@@ -31,6 +31,9 @@ export default function App() {
   const [tab,          setTab]          = useState('scan');
   const [friendRequests, setFriendRequests] = useState([]);
   const [reactions, setReactions] = useState({});
+  const [myNotifications, setMyNotifications] = useState([]);
+  const [showNotif, setShowNotif] = useState(false);
+  const [feedReactions, setFeedReactions] = useState({});
 
   useEffect(() => {
     onAuthStateChanged(auth, async (u) => {
@@ -42,6 +45,7 @@ export default function App() {
           setMyUsername(userDoc.docs[0].data().username);
           setUsernameSet(true);
           listenFriendsMoods(u.uid);
+          listenFriendRequests(u.uid);
           listenFriendRequests(u.uid);
         }
       } else {
@@ -73,7 +77,44 @@ export default function App() {
       setFriendRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
   };
+  const listenNotifications = (uid) => {
+  const q = query(
+    collection(db, 'notifications'),
+    where('toUid', '==', uid)
+  );
+  onSnapshot(q, (snap) => {
+    const notifs = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => b.timestamp - a.timestamp);
+    setMyNotifications(notifs);
+    if (notifs.some(n => !n.read)) setShowNotif(true);
+  });
+};
 
+const listenReactions = (uid) => {
+  const q = query(
+    collection(db, 'reactions'),
+    where('toUid', '==', uid)
+  );
+  onSnapshot(q, (snap) => {
+    const reactionMap = {};
+    snap.docs.forEach(d => {
+      const data = d.data();
+      const key = data.reaction;
+      reactionMap[key] = (reactionMap[key] || 0) + 1;
+    });
+    setFeedReactions(reactionMap);
+  });
+};
+
+const markAllRead = async () => {
+  myNotifications.forEach(async (n) => {
+    if (!n.read) {
+      await setDoc(doc(db, 'notifications', n.id), { ...n, read: true });
+    }
+  });
+  setShowNotif(false);
+};
   const loginWithGoogle = async () => {
     try { await signInWithPopup(auth, provider); }
     catch (e) { console.log(e); }
@@ -259,6 +300,13 @@ const checkOnFriend = async (friend) => {
   const reactionBtn    = { padding:'4px 10px', backgroundColor:'#1a1a2e', border:'1px solid #333', borderRadius:'15px', fontSize:'0.85rem', cursor:'pointer', color:'white' };
   const reactionSent   = { padding:'4px 10px', backgroundColor:'#4376FF', border:'1px solid #4376FF', borderRadius:'15px', fontSize:'0.85rem', cursor:'pointer', color:'white' };
   const checkOnBtnStyle = { marginTop:'6px', padding:'5px 12px', backgroundColor:'transparent', border:'1px solid #ff6b35', borderRadius:'15px', fontSize:'0.78rem', cursor:'pointer', color:'#ff6b35' };
+  const notifBell    = { position:'relative', cursor:'pointer', fontSize:'1.4rem' };
+  const notifDot     = { position:'absolute', top:'-4px', right:'-4px', width:'10px', height:'10px', backgroundColor:'#ff4444', borderRadius:'50%' };
+  const notifPanel   = { backgroundColor:'#1a1a2e', border:'1px solid #4376FF', borderRadius:'16px', padding:'16px', maxWidth:'360px', width:'100%', marginBottom:'16px' };
+  const notifTitle   = { color:'#4376FF', fontSize:'0.88rem', fontWeight:'bold', marginBottom:'10px' };
+  const notifItem    = { backgroundColor:'#111', borderRadius:'10px', padding:'10px 14px', marginBottom:'6px', color:'#fff', fontSize:'0.85rem' };
+  const notifTime    = { color:'#555', fontSize:'0.72rem', marginTop:'3px' };
+  const reactionCount = { backgroundColor:'#1a1a2e', borderRadius:'10px', padding:'8px 12px', marginTop:'8px', color:'#aaa', fontSize:'0.82rem' };
 
   const getScoreStyle = (v) => {
     if (v >= 85) return scoreHigh;
@@ -317,8 +365,27 @@ const checkOnFriend = async (friend) => {
           <div style={userHandle}>@{myUsername}</div>
         </div>
         <button onClick={() => signOut(auth)} style={logoutBtn}>Logout</button>
+        <div style={notifBell} onClick={() => setShowNotif(!showNotif)}>
+  🔔
+  {myNotifications.some(n => !n.read) && <div style={notifDot} />}
+</div>
       </div>
-
+      {showNotif && myNotifications.length > 0 && (
+  <div style={notifPanel}>
+    <div style={notifTitle}>
+      Notifications ({myNotifications.filter(n => !n.read).length} new)
+    </div>
+    {myNotifications.slice(0, 5).map((n, i) => (
+      <div key={i} style={notifItem}>
+        <div>{n.fromUsername} — {n.message}</div>
+        <div style={notifTime}>{timeAgo(n.timestamp)}</div>
+      </div>
+    ))}
+    <button onClick={markAllRead} style={checkOnBtnStyle}>
+      Mark all read
+    </button>
+  </div>
+)}
       <div style={tabWrap}>
         <button onClick={() => setTab('scan')}    style={tab==='scan'    ? tabActive : tabInactive}>Scan</button>
         <button onClick={() => setTab('feed')}    style={tab==='feed'    ? tabActive : tabInactive}>Friends Feed</button>
@@ -394,6 +461,11 @@ const checkOnFriend = async (friend) => {
     );
   })}
 </div>
+{Object.keys(feedReactions).length > 0 && m.userId === user.uid && (
+  <div style={reactionCount}>
+    Reactions received: {Object.entries(feedReactions).map(([e, c]) => e + ' x' + c + '  ')}
+  </div>
+)}
 <button
   onClick={() => checkOnFriend(m)}
   style={checkOnBtnStyle}
