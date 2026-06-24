@@ -30,6 +30,7 @@ export default function App() {
   const [usernameSet,  setUsernameSet]  = useState(false);
   const [tab,          setTab]          = useState('scan');
   const [friendRequests, setFriendRequests] = useState([]);
+  const [reactions, setReactions] = useState({});
 
   useEffect(() => {
     onAuthStateChanged(auth, async (u) => {
@@ -171,6 +172,39 @@ export default function App() {
     if (hrs < 24) return hrs + ' hr ago';
     return Math.floor(hrs/24) + ' days ago';
   };
+  const sendReaction = async (toUserId, reactionEmoji) => {
+  try {
+    await addDoc(collection(db, 'reactions'), {
+      fromUid:      user.uid,
+      fromName:     user.displayName,
+      fromUsername: myUsername,
+      toUid:        toUserId,
+      reaction:     reactionEmoji,
+      timestamp:    Date.now(),
+    });
+    const key = toUserId + reactionEmoji;
+    setReactions(prev => ({ ...prev, [key]: true }));
+    setTimeout(() => setReactions(prev => ({ ...prev, [key]: false })), 2000);
+  } catch (e) {
+    console.log('Reaction error:', e.message);
+  }
+};
+
+const checkOnFriend = async (friend) => {
+  try {
+    await addDoc(collection(db, 'notifications'), {
+      toUid:        friend.userId,
+      fromName:     user.displayName,
+      fromUsername: myUsername,
+      message:      myUsername + ' is checking on you! You okay?',
+      timestamp:    Date.now(),
+      read:         false,
+    });
+    alert('Check on request bhej diya ' + friend.name + ' ko!');
+  } catch (e) {
+    console.log('Check on error:', e.message);
+  }
+};
 
   // Styles
   const wrap       = { display:'flex', flexDirection:'column', alignItems:'center', minHeight:'100vh', backgroundColor:'#0a0a0a', fontFamily:'Arial', padding:'20px 16px 80px' };
@@ -221,6 +255,10 @@ export default function App() {
   const reqFromHandle  = { color:'#555', fontSize:'0.78rem' };
   const addFriendTitle = { color:'#888', fontSize:'0.85rem', margin:'14px 0 10px', alignSelf:'flex-start' };
   const addFriendRow   = { display:'flex', gap:'8px', flexWrap:'wrap', justifyContent:'center' };
+  const reactionsRow   = { display:'flex', gap:'6px', marginTop:'8px', flexWrap:'wrap' };
+  const reactionBtn    = { padding:'4px 10px', backgroundColor:'#1a1a2e', border:'1px solid #333', borderRadius:'15px', fontSize:'0.85rem', cursor:'pointer', color:'white' };
+  const reactionSent   = { padding:'4px 10px', backgroundColor:'#4376FF', border:'1px solid #4376FF', borderRadius:'15px', fontSize:'0.85rem', cursor:'pointer', color:'white' };
+  const checkOnBtnStyle = { marginTop:'6px', padding:'5px 12px', backgroundColor:'transparent', border:'1px solid #ff6b35', borderRadius:'15px', fontSize:'0.78rem', cursor:'pointer', color:'#ff6b35' };
 
   const getScoreStyle = (v) => {
     if (v >= 85) return scoreHigh;
@@ -342,6 +380,26 @@ export default function App() {
                     <div style={dynamicHandle}>@{m.username}</div>
                     <div style={dynamicScore}>Score: {m.score}/100</div>
                     <div style={feedTime}>{timeAgo(m.timestamp)}</div>
+                    <div style={reactionsRow}>
+  {['❤️','🤗','☕','🎵','💪'].map(emoji => {
+    const key = m.userId + emoji;
+    return (
+      <button
+        key={emoji}
+        onClick={() => sendReaction(m.userId, emoji)}
+        style={reactions[key] ? reactionSent : reactionBtn}
+      >
+        {emoji}
+      </button>
+    );
+  })}
+</div>
+<button
+  onClick={() => checkOnFriend(m)}
+  style={checkOnBtnStyle}
+>
+  Check On Them
+</button>
                   </div>
                   <div style={feedEmoji}>{m.emoji}</div>
                 </div>
