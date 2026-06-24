@@ -47,6 +47,7 @@ export default function App() {
           listenFriendsMoods(u.uid);
           listenFriendRequests(u.uid);
           listenFriendRequests(u.uid);
+          listenNotifications(u.uid);
         }
       } else {
         setUser(null);
@@ -130,6 +131,8 @@ const markAllRead = async () => {
     setUsernameSet(true);
     listenFriendsMoods(user.uid);
     listenFriendRequests(user.uid);
+    listenNotifications(user.uid);
+    listenReactions(user.uid);
   };
 
   const sendFriendRequest = async () => {
